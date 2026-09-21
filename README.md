@@ -25,7 +25,8 @@ In a backend repository:
 ```sh
 git submodule update --init --recursive
 # After committing a shared demo change:
-git -C demos pull --ff-only
+git -C demos fetch origin
+git -C demos checkout --detach origin/main
 git add demos
 git commit -m "Update shared Jev demos"
 ```
