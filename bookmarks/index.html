@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bookmark sorter · Jev demo</title>
+<link rel="stylesheet" href="../style.css?v=15">
+<link rel="stylesheet" href="../bookmarks.css?v=15">
+</head>
+<body class="workspace-page bookmarks-page">
+<header class="page">
+  <span class="badge page-meta">Batch input / Choice</span>
+  <div class="kicker">Decision lab / Classification</div>
+  <h1>Bookmark sorter</h1>
+  <span class="sub">A place for every link. Sort your bookmarks and find the decisions that need a second look.</span>
+</header>
+<main>
+  <div id="single"><div class="colcfg-slot"></div><div class="col-demo"></div></div>
+  <div id="compare" class="grid2" hidden>
+    <div class="cmp-col" data-col="a"><div class="colcfg-slot"></div><div class="col-demo"></div></div>
+    <div class="cmp-col" data-col="b"><div class="colcfg-slot"></div><div class="col-demo"></div></div>
+  </div>
+</main>
+<script src="../jev-client.js?v=15"></script>
+<script>
+function mountBookmarks(root, call) {
+  root.innerHTML = `
+    <div class="sorter-layout">
+      <div class="sorter-setup">
+        <section class="card import-panel">
+          <div class="panel-heading"><h2><span class="step-number">1</span> Add bookmarks</h2><button class="sample ghost">Example</button></div>
+          <button class="dropzone" type="button">${uiIcon("upload")}<strong>Drop your bookmark export here</strong><span>or click to browse · HTML file</span></button>
+          <input type="file" class="file" accept=".html,.htm" aria-label="Import bookmarks" hidden>
+          <label class="fld">Or paste links <span class="muted">· one per line</span><textarea class="manual" rows="3" placeholder="MDN Web Docs :: https://developer.mozilla.org&#10;Hacker News :: https://news.ycombinator.com"></textarea></label>
+          <div class="spread"><button class="parse">Load bookmarks</button><span class="count muted" role="status">No bookmarks loaded</span></div>
+        </section>
+        <details class="card category-panel">
+          <summary><span class="category-heading"><span class="step-number">2</span><strong>Categories</strong><span class="badge category-count">5 categories</span><span class="category-chevron">⌄</span></span><span class="category-preview">dev · reading · shopping · work · other</span></summary>
+          <div class="panel-heading"><span class="muted">Customize your categories</span><button class="add-cat ghost">+ Add</button></div>
+          <div class="cat-labels"><span>Category</span><span>What belongs here</span></div>
+          <div class="cats"></div>
+          <div class="review-hint"><span class="hint-dot"></span>Confidence below 60% is flagged for your review.</div>
+        </details>
+      </div>
+      <section class="card results-panel">
+        <div class="panel-heading"><h2>Sorted library</h2><span class="eyebrow">RESULTS</span></div>
+        <div class="card run-panel">
+          <div class="spread"><button class="primary run" disabled>Classify →</button><button class="stop ghost" disabled>Stop</button></div>
+          <div class="run-settings"><label>Parallel requests <select class="conc"><option>1</option><option selected>3</option><option>6</option></select></label><span class="note muted" role="status">Add bookmarks to get started</span></div>
+          <div class="progress" role="progressbar" aria-label="Classification progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div class="pfill"></div></div>
+        </div>
+        <div class="totals row"></div>
+        <div class="out"><div class="empty-state">${uiIcon("layers")}<strong>Your sorted library</strong><p>Add your bookmarks, choose the categories, and start sorting. Your results will appear here.</p><div class="empty-category-tags"><span>dev</span><span>reading</span><span>work</span></div></div></div>
+      </section>
+    </div>`;
+
+  const $ = (s) => root.querySelector(s[0] === "." ? s : "." + s);
+  let cats = [
+    { id: "dev", desc: "Documentation, tools, libraries, programming" },
+    { id: "reading", desc: "Articles, news, blogs, essays to read" },
+    { id: "shopping", desc: "Shops, products, wishlists, deals" },
+    { id: "work", desc: "Work dashboards, admin panels, company links" },
+    { id: "other", desc: "None of the above" },
+  ];
+  let items = [];
+  let stopped = false, running = false;
+  function updateReady() {
+    $(".run").disabled = running || !items.length;
+    if (!running) $(".note").textContent = items.length ? `${items.length} bookmarks ready to classify` : "Add bookmarks to get started";
+  }
+  function lockInputs(locked) {
+    root.querySelectorAll(".sorter-setup input, .sorter-setup textarea, .sorter-setup select, .sorter-setup button, .run-panel select").forEach(el => el.disabled = locked);
+    $(".stop").disabled = !locked;
+    $(".run").disabled = locked || !items.length;
+    $(".run").textContent = locked ? "Classifying…" : "Classify →";
+  }
+  function validUrl(value) {
+    try { const url = new URL(value); return ["http:", "https:"].includes(url.protocol); } catch (_) { return false; }
+  }
+
+  const dz = $(".dropzone");
+  dz.onclick = () => $(".file").click();
+  dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("hover"); };
+  dz.ondragleave = () => dz.classList.remove("hover");
+  dz.ondrop = (e) => {
+    e.preventDefault(); dz.classList.remove("hover");
+    if (running) return;
+    const f = e.dataTransfer.files[0];
+    if (f) f.text().then(parseNetscape);
+  };
+  $(".file").onchange = (e) => { const f = e.target.files[0]; if (f) f.text().then(parseNetscape); };
+
+  function parseNetscape(text) {
+    if (running) return;
+    items = [];
+    const re = /<A[^>]*HREF="([^"]+)"[^>]*>([^<]*)<\/A>/gi;
+    let m;
+    while ((m = re.exec(text)) && items.length < 400) {
+      const t = document.createElement("textarea");
+      t.innerHTML = m[2].trim();
+      items.push({ url: m[1], title: t.value || m[1] });
+    }
+    items = items.filter(item => validUrl(item.url));
+    $(".count").textContent = items.length + " bookmarks loaded";
+    updateReady();
+  }
+  $(".parse").onclick = () => {
+    if (running) return;
+    items = $(".manual").value.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+      const i = l.indexOf("::");
+      return i > 0 ? { title: l.slice(0, i).trim(), url: l.slice(i + 2).trim() } : { title: l, url: l };
+    });
+    const invalid = items.filter(item => !validUrl(item.url)).length;
+    items = items.filter(item => validUrl(item.url));
+    $(".count").textContent = `${items.length} loaded` + (invalid ? ` · ${invalid} invalid links skipped` : "");
+    updateReady();
+  };
+
+  $(".sample").onclick = () => {
+    $(".manual").value = "MDN Web Docs :: https://developer.mozilla.org\nHacker News :: https://news.ycombinator.com\nGitHub :: https://github.com\nLinear :: https://linear.app\nWikipedia :: https://wikipedia.org";
+    $(".parse").click();
+  };
+
+  function renderCats() {
+    $(".category-count").textContent = cats.length + " categories";
+    $(".category-preview").textContent = cats.map(c => c.id.trim()).filter(Boolean).join(" · ") || "Add at least one category";
+    const el = $(".cats");
+    el.innerHTML = "";
+    cats.forEach((c, i) => {
+      const row = document.createElement("div");
+      row.className = "cat-row";
+      row.innerHTML = `<input type="text" aria-label="Category name" placeholder="Name" value="${escapeHtml(c.id)}">
+        <input type="text" aria-label="Category description" placeholder="Description" value="${escapeHtml(c.desc || "")}">
+        <button class="danger" aria-label="Remove category" title="Remove category">×</button>`;
+      row.querySelectorAll("input")[0].oninput = (e) => { cats[i].id = e.target.value; $(".category-preview").textContent = cats.map(c => c.id.trim()).filter(Boolean).join(" · "); };
+      row.querySelectorAll("input")[1].oninput = (e) => { cats[i].desc = e.target.value; };
+      row.querySelector("button").onclick = () => { cats.splice(i, 1); renderCats(); };
+      el.appendChild(row);
+    });
+  }
+  $(".add-cat").onclick = () => { cats.push({ id: "", desc: "" }); renderCats(); };
+  function stop() {
+    stopped = true;
+    if (running) { $(".note").textContent = "Stopping after current requests…"; $(".stop").disabled = true; }
+  }
+  $(".stop").onclick = stop;
+  root.addEventListener("demo:pause", stop);
+
+  $(".run").onclick = async () => {
+    if (running) return;
+    const names = cats.map(c => c.id.trim()).filter(Boolean);
+    if (new Set(names).size !== names.length) { $(".note").textContent = "Give each category a unique name."; return; }
+    const criteria = Object.create(null);
+    cats.filter((c) => c.id.trim()).forEach((c) => (criteria[c.id.trim()] = c.desc || null));
+    if (!Object.keys(criteria).length || !items.length) { $(".note").textContent = "need bookmarks and categories"; return; }
+    stopped = false; running = true; lockInputs(true);
+    const conc = +$(".conc").value;
+    const out = $(".out"), totals = $(".totals"), prog = $(".progress");
+    prog.hidden = false;
+    out.innerHTML = '<div class="empty-state"><strong>Sorting your bookmarks…</strong><p>Results will appear when this batch finishes. You can stop to see partial results.</p></div>'; totals.innerHTML = "";
+    prog.querySelector(".pfill").style.width = "0%";
+    prog.setAttribute("aria-valuenow", "0");
+    $(".note").textContent = "classifying…";
+
+    const t0 = performance.now();
+    let done = 0, inTok = 0, outTok = 0, fails = 0;
+    const results = new Array(items.length);
+    let idx = 0;
+    async function worker() {
+      while (true) {
+        if (stopped) return;
+        const i = idx++;
+        if (i >= items.length) return;
+        const it = items[i];
+        try {
+          const r = await call({
+            state: `Title: ${it.title}\nURL: ${it.url}`,
+            questions: { cat: { type: "choice", instructions: "Which category does this bookmark belong to?", criteria } },
+          });
+          const a = r.data.answers.cat;
+          inTok += r.data.usage?.input_tokens || 0;
+          outTok += r.data.usage?.output_tokens || 0;
+          results[i] = { ...it, cat: a.choice, conf: a.confidence ?? 0 };
+        } catch (e) {
+          fails++;
+          results[i] = { ...it, cat: "ERROR", conf: 0, err: e.message };
+        }
+        done++;
+        prog.querySelector(".pfill").style.width = (done / items.length * 100).toFixed(1) + "%";
+        prog.setAttribute("aria-valuenow", String(Math.round(done / items.length * 100)));
+        $(".note").textContent = `${done} / ${items.length} classified` + (stopped ? " · stopping…" : "");
+      }
+    }
+    await Promise.all(Array.from({ length: conc }, worker));
+
+    out.innerHTML = "";
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    totals.innerHTML = `
+      <span class="badge">${done} / ${items.length} classified</span>
+      <span class="badge ${fails ? "bad" : "good"}">${fails} failures</span>
+      <span class="badge">${inTok} in / ${outTok} out tok</span>
+      <span class="badge">${secs} s</span>
+      <span class="badge warn">${results.filter((r) => r && !r.err && r.conf < 0.6).length} for review</span>`;
+    const byCat = Object.create(null);
+    results.filter(Boolean).forEach((r) => ((byCat[r.cat] = byCat[r.cat] || []).push(r)));
+    for (const [cat, rows] of Object.entries(byCat).sort((a, b) => b[1].length - a[1].length)) {
+      const h = document.createElement("div");
+      h.className = "cat-h";
+      h.textContent = `${cat} (${rows.length})`;
+      out.appendChild(h);
+      const table = document.createElement("table");
+      table.className = "res";
+      table.innerHTML = rows.map((r) => `
+        <tr class="${r.err ? "" : r.conf < 0.6 ? "low" : ""}">
+          <td style="width:52%"><div>${escapeHtml(r.title)}</div><a class="muted mono" style="font-size:11.5px" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.url.slice(0, 56))}</a></td>
+          <td style="width:104px"><span class="mini-track"><span class="mini-fill" style="width:${(r.conf * 100).toFixed(0)}%"></span></span> <span class="muted mono" style="font-size:11.5px">${(r.conf * 100).toFixed(0)}%</span></td>
+          <td>${r.err ? `<span class="badge bad">${escapeHtml(r.err.slice(0, 40))}</span>` : r.conf < 0.6 ? '<span class="badge warn">review</span>' : '<span class="badge good">ok</span>'}</td>
+        </tr>`).join("");
+      out.appendChild(table);
+    }
+    running = false; lockInputs(false);
+    $(".note").textContent = stopped ? `Stopped · ${done} of ${items.length} classified` : `Finished in ${secs}s`;
+  };
+  renderCats();
+}
+
+cmpLayout({
+  single: document.getElementById("single"),
+  compare: document.getElementById("compare"),
+  build: (root, call) => mountBookmarks(root, call),
+});
+</script>
+</body>
+</html>

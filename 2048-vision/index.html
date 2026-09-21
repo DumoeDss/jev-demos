@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2048 vision · Jev demo</title>
+<link rel="stylesheet" href="../style.css?v=15">
+<link rel="stylesheet" href="../game.css?v=15">
+</head>
+<body class="workspace-page game-page vision-page">
+<header class="page">
+  <span class="badge page-meta">Image input / Choice</span>
+  <div class="kicker">Decision lab / Vision</div>
+  <h1>2048 vision</h1>
+  <span class="sub">Watch a model play from a screenshot. See the image, the decision, and its confidence.</span>
+</header>
+<main>
+  <div id="single"><div class="colcfg-slot"></div><div class="col-demo"></div></div>
+  <div id="compare" class="grid2" hidden>
+    <div class="cmp-col" data-col="a"><div class="colcfg-slot"></div><div class="col-demo"></div></div>
+    <div class="cmp-col" data-col="b"><div class="colcfg-slot"></div><div class="col-demo"></div></div>
+  </div>
+</main>
+<script src="../jev-client.js?v=15"></script>
+<script>
+function mount2048Vision(root, call) {
+  root.innerHTML = `
+    <div class="stage">
+      <section class="card control-panel" aria-label="Autopilot controls">
+        <div class="panel-heading"><h2>Autopilot</h2><span class="run-status" role="status">Ready</span></div>
+        <p class="panel-description">Let the model choose each move, or take a single step to see how it decides.</p>
+        <div class="controls-row"><button class="primary auto">▶ Autopilot</button><button class="step">Step →</button></div>
+        <label class="interval-row">Move interval<select class="interval">
+          <option value="0" selected>As fast as possible</option><option value="300">0.3 seconds</option>
+          <option value="600">0.6 seconds</option><option value="1200">1.2 seconds</option>
+          <option value="2500">2.5 seconds</option><option value="5000">5 seconds</option>
+        </select></label>
+      </section>
+      <section class="card game-panel" aria-label="Game">
+        <div class="board-heading">
+          <div class="score-stat"><span>Score</span><b class="score">0</b></div>
+          <div class="score-stat"><span>Best</span><b class="best">0</b></div>
+          <button class="ghost newgame" title="Start a new game">↻ New game</button>
+        </div>
+        <div class="board-wrap" tabindex="0" aria-label="Game controls. Use arrow keys or WASD.">
+          <canvas class="board" width="530" height="594" aria-label="2048 game board"></canvas>
+          <div class="overlay"><b>Game over</b><button class="primary newgame">Try again</button></div>
+        </div>
+        <div class="moves" aria-label="Move tiles">
+          <button data-dir="up" aria-label="Move up">↑</button><button data-dir="left" aria-label="Move left">←</button>
+          <button data-dir="down" aria-label="Move down">↓</button><button data-dir="right" aria-label="Move right">→</button>
+        </div>
+        <p class="keyboard-hint">Play with <kbd>↑ ↓ ← →</kbd> or <kbd>W A S D</kbd></p>
+      </section>
+      <section class="card decision-panel" aria-label="Model decision">
+        <div class="panel-heading"><h2>Move probabilities</h2><span class="eyebrow">LIVE OUTPUT</span></div>
+        <div class="decision-top" hidden><span class="decision-label">Selected move</span><strong class="decision-choice">—</strong><span class="confidence">—</span></div>
+        <div class="bars"></div>
+        <p class="decision-note">Take a step to see the probability of each legal move.</p>
+        <div class="row meta" role="status"></div>
+        <div class="decision-details">
+          <details class="raw image-details" open><summary>Image input</summary><div class="image-preview"><p class="muted">The exact screenshot from the last move.</p><img class="shot" alt="Board screenshot sent to the model"></div></details>
+          <details class="raw" open><summary>Request / response</summary><pre class="json rawjson">No requests yet.</pre></details>
+        </div>
+      </section>
+    </div>
+    <div class="workspace-footer"><span>Only legal moves are sent to the model.</span><span>Jev / decision lab</span></div>`;
+
+  const $ = (s) => root.querySelector(s[0] === "." ? s : "." + s);
+  const SIZE = 4;
+  let grid, score, over, auto = false, busy = false, timer = null;
+
+  /* ---- canvas board: display AND the screenshot the model receives ---- */
+
+  const canvas = $(".board");
+  const cx = canvas.getContext("2d");
+  const HEAD = 64, PAD = 10, GAP = 10, CELL = 120; // 530 = PAD*2 + CELL*4 + GAP*3
+  const TILE = {
+    2: "#22303f", 4: "#24405a", 8: "#2d5a86", 16: "#317ab0",
+    32: "#3f9bd6", 64: "#55b8ea", 128: "#3ecf8e", 256: "#3ecf8e",
+    512: "#f2b544", 1024: "#f2b544", 2048: "#f26d6d",
+  };
+  function tileText(v) { return v >= 128 ? "#0b2318" : "#dbe4f0"; }
+  function roundRect(x, y, w, h, r) {
+    cx.beginPath();
+    cx.moveTo(x + r, y);
+    cx.arcTo(x + w, y, x + w, y + h, r);
+    cx.arcTo(x + w, y + h, x, y + h, r);
+    cx.arcTo(x, y + h, x, y, r);
+    cx.arcTo(x, y, x + w, y, r);
+    cx.closePath();
+  }
+  function render() {
+    cx.fillStyle = "#10151c";
+    cx.fillRect(0, 0, canvas.width, canvas.height);
+    // header: game name + score, so the model can read both off the image
+    cx.fillStyle = "#dbe4f0";
+    cx.font = "700 34px system-ui, sans-serif";
+    cx.textBaseline = "middle";
+    cx.textAlign = "left";
+    cx.fillText("2048", PAD, HEAD / 2);
+    cx.font = "600 24px system-ui, sans-serif";
+    cx.fillStyle = "#8b98ab";
+    cx.textAlign = "right";
+    cx.fillText("score " + score, canvas.width - PAD, HEAD / 2);
+    // board
+    grid.forEach((row, y) => row.forEach((v, x) => {
+      const px = PAD + x * (CELL + GAP), py = HEAD + PAD + y * (CELL + GAP);
+      cx.fillStyle = v ? TILE[v] || "#8b5cf6" : "#0b0e13";
+      roundRect(px, py, CELL, CELL, 10);
+      cx.fill();
+      if (!v) { cx.strokeStyle = "#2a3342"; cx.lineWidth = 1; cx.stroke(); }
+      else {
+        cx.fillStyle = tileText(v);
+        cx.font = `700 ${v >= 1024 ? 40 : v >= 128 ? 46 : 52}px system-ui, sans-serif`;
+        cx.textAlign = "center";
+        cx.fillText(String(v), px + CELL / 2, py + CELL / 2 + 2);
+      }
+    }));
+    $(".score").textContent = score;
+    const best = Math.max(score, +(localStorage.getItem("openjev.2048visionbest") || 0));
+    localStorage.setItem("openjev.2048visionbest", best);
+    $(".best").textContent = best;
+    root.querySelectorAll(".moves button").forEach((b) => b.classList.toggle("illegal", !moveChanges(b.dataset.dir)));
+  }
+
+  /* ---- game mechanics (same rules as the text demo) ---- */
+
+  function reset() {
+    if (busy) return;
+    auto = false; clearTimeout(timer);
+    $(".decision-top").hidden = true;
+    $(".bars").innerHTML = '<div class="empty-chart">' + ["Up", "Left", "Down", "Right"].map(d => `<div><span>${d}</span><i></i><span>—</span></div>`).join("") + '</div>';
+    $(".decision-note").textContent = "Take a step to see the probability of each legal move.";
+    $(".meta").innerHTML = "";
+    $(".rawjson").textContent = "No requests yet.";
+    if ($(".shot")) { $(".shot").removeAttribute("src"); $(".shot").style.display = "none"; }
+    grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+    score = 0; over = false; busy = false;
+    $(".overlay").style.display = "none";
+    addTile(); addTile(); render(); updateAutoBtn();
+  }
+  function addTile() {
+    const empty = [];
+    grid.forEach((r, y) => r.forEach((v, x) => { if (!v) empty.push([y, x]); }));
+    if (!empty.length) return;
+    const [y, x] = empty[Math.floor(Math.random() * empty.length)];
+    grid[y][x] = Math.random() < 0.9 ? 2 : 4;
+  }
+  function slide(line) {
+    const a = line.filter((v) => v);
+    let gained = 0;
+    for (let i = 0; i + 1 < a.length; i++) {
+      if (a[i] === a[i + 1]) { a[i] *= 2; gained += a[i]; a.splice(i + 1, 1); }
+    }
+    while (a.length < SIZE) a.push(0);
+    return { line: a, gained };
+  }
+  function move(dir) {
+    if (over) return false;
+    let moved = false, gainedAll = 0;
+    const get = (i, j) => dir === "up" ? grid[j][i] : dir === "down" ? grid[SIZE - 1 - j][i]
+      : dir === "left" ? grid[i][j] : grid[i][SIZE - 1 - j];
+    const set = (i, j, v) => {
+      if (dir === "up") grid[j][i] = v; else if (dir === "down") grid[SIZE - 1 - j][i] = v;
+      else if (dir === "left") grid[i][j] = v; else grid[i][SIZE - 1 - j] = v;
+    };
+    for (let i = 0; i < SIZE; i++) {
+      const orig = Array.from({ length: SIZE }, (_, j) => get(i, j));
+      const { line, gained } = slide(orig);
+      gainedAll += gained;
+      for (let j = 0; j < SIZE; j++) if (orig[j] !== line[j]) { moved = true; set(i, j, line[j]); }
+    }
+    if (moved) { score += gainedAll; addTile(); render(); if (!canMove()) endGame(); }
+    return moved;
+  }
+  function moveChanges(dir) {
+    const get = (i, j) => dir === "up" ? grid[j][i] : dir === "down" ? grid[SIZE - 1 - j][i]
+      : dir === "left" ? grid[i][j] : grid[i][SIZE - 1 - j];
+    for (let i = 0; i < SIZE; i++) {
+      const orig = Array.from({ length: SIZE }, (_, j) => get(i, j));
+      const { line } = slide(orig);
+      for (let j = 0; j < SIZE; j++) if (orig[j] !== line[j]) return true;
+    }
+    return false;
+  }
+  function legalMoves() { return ["up", "down", "left", "right"].filter(moveChanges); }
+  function canMove() { return legalMoves().length > 0; }
+  function endGame() {
+    over = true; auto = false; clearTimeout(timer); updateAutoBtn();
+    $(".overlay").style.display = "flex";
+  }
+
+  /* ---- autopilot: one choice question per move, board sent as a PNG screenshot ---- */
+
+  const DIR_DESC = { up: "slide all tiles up", down: "slide all tiles down", left: "slide all tiles left", right: "slide all tiles right" };
+
+  async function autopilotStep() {
+    if (over || busy) return;
+    busy = true; updateAutoBtn();
+    const legal = legalMoves();
+    // only legal directions are offered — whatever the model picks is executable as-is
+    const criteria = {};
+    legal.forEach((d) => (criteria[d] = DIR_DESC[d]));
+    const shot = canvas.toDataURL("image/png");
+    try {
+      const r = await call({
+        messages: [{ role: "user", content: [
+          { type: "text", text: "A screenshot of the current 2048 position — the board and the score are only in the image. Read them off the image and pick the best next move." },
+          { type: "image_url", image_url: { url: shot } },
+        ]}],
+        questions: { move: {
+          type: "choice",
+          instructions: "Pick the best next move in this 2048 position. Prefer moves that merge tiles, keep the large tiles cornered, and maximize the score.",
+          criteria,
+        } },
+      });
+      const a = r.data.answers.move;
+      renderBars($(".bars"), a.probabilities);
+      $(".decision-top").hidden = false;
+      $(".decision-choice").textContent = a.choice;
+      $(".confidence").textContent = ((a.confidence ?? a.probabilities[a.choice] ?? 0) * 100).toFixed(1) + "%";
+      $(".decision-note").textContent = "Distribution for the position before this move.";
+      const order = Object.entries(a.probabilities).sort((x, y) => y[1] - x[1]).map(([k]) => k);
+      const drive = order.find((d) => legal.includes(d)) || legal[0];
+      $(".meta").innerHTML =
+        `<span class="badge">${escapeHtml(usageLine(r.data.usage, r.latency))}</span>` +
+        `<span class="badge good">picked & applied <b>${escapeHtml(a.choice)}</b></span>`;
+      root.querySelectorAll(".bar-row").forEach((row) => {
+        if (row.querySelector(".lbl").textContent.trim() === drive) {
+          row.querySelector(".lbl").textContent += "  ▶";
+        }
+      });
+      const img = $(".shot");
+      img.src = shot;
+      img.style.display = "block";
+      const slim = { ...r.request, messages: [{ ...r.request.messages[0], content: [
+        r.request.messages[0].content[0],
+        { ...r.request.messages[0].content[1], image_url: { url: `«${shot.length}-char PNG data URL»` } },
+      ]}] };
+      $(".rawjson").textContent =
+        "request (image elided):\n" + JSON.stringify(slim, null, 1) + "\n\nresponse:\n" + JSON.stringify(r.data, null, 1);
+      root.querySelectorAll(".moves button").forEach((b) => b.classList.toggle("chosen", b.dataset.dir === drive));
+      move(drive);
+    } catch (e) {
+      auto = false; clearTimeout(timer);
+      $(".meta").innerHTML = `<span class="badge bad">${escapeHtml(e.message)}</span>`;
+    } finally { busy = false; updateAutoBtn(); }
+    if (auto && !over) timer = setTimeout(autopilotStep, +$(".interval").value);
+  }
+  function updateAutoBtn() {
+    const b = $(".auto");
+    b.textContent = auto ? "Ⅱ Pause" : "▶ Autopilot";
+    $(".step").disabled = busy || auto || over;
+    $(".step").textContent = busy ? "Thinking…" : "Step →";
+    b.disabled = over;
+    root.querySelectorAll(".newgame").forEach(button => button.disabled = busy);
+    root.querySelectorAll(".moves button").forEach(button => button.disabled = busy || auto || over);
+    $(".run-status").textContent = over ? "Game over" : busy ? "Thinking…" : auto ? "Running" : "Ready";
+    $(".run-status").classList.toggle("running", busy || auto);
+    b.classList.toggle("primary", !auto);
+  }
+  $(".auto").onclick = () => { auto = !auto; updateAutoBtn(); if (auto) autopilotStep(); else clearTimeout(timer); };
+  $(".step").onclick = autopilotStep;
+  root.querySelectorAll(".newgame").forEach(button => button.onclick = reset);
+  root.querySelectorAll(".moves button").forEach((b) => (b.onclick = () => { if (!auto && !busy) { move(b.dataset.dir); updateAutoBtn(); } }));
+  // keyboard is scoped to the focused board — in compare mode each column
+  // only responds once clicked, so two boards never fight over the arrows
+  const wrap = root.querySelector(".board-wrap");
+  wrap.addEventListener("pointerdown", () => wrap.focus());
+  wrap.addEventListener("keydown", (e) => {
+    if (auto || busy || e.target.closest("button")) return;
+    const k = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+                w: "up", s: "down", a: "left", d: "right" }[e.key];
+    if (k) { e.preventDefault(); move(k); }
+  });
+  root.addEventListener("demo:pause", () => { auto = false; clearTimeout(timer); updateAutoBtn(); });
+  reset();
+}
+
+cmpLayout({
+  single: document.getElementById("single"),
+  compare: document.getElementById("compare"),
+  build: (root, call) => mount2048Vision(root, call),
+  noOfficial: true, // this demo sends images; the official jev API is text-only
+});
+</script>
+</body>
+</html>

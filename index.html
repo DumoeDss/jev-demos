@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f0ebde">
+<title>Decision lab · Jev</title>
+<link rel="stylesheet" href="style.css?v=15">
+<link rel="stylesheet" href="home.css?v=15">
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div>
+      <div class="kicker">The Jev playground</div>
+      <h1>Small decisions.<br><span>Visible intelligence.</span></h1>
+      <p class="lead">See what a model chooses. Understand how certain it is.<br> Explore real tasks with live probabilities, one decision at a time.</p>
+      <a class="hero-cta" href="2048/">Open the playground <span aria-hidden="true">↗</span></a>
+      <div class="hero-meta"><span>01 / Choose a task</span><span>02 / Connect a model</span><span>03 / See it decide</span></div>
+    </div>
+    <div class="decision-preview" aria-label="Illustration of a model choosing a move">
+      <div class="preview-heading"><span class="preview-dot"></span> A decision, made visible <span class="badge">Illustration</span></div>
+      <div class="signal-flow"><span>State</span><i></i><span class="signal-model">Jev</span><i></i><span>Decision</span></div>
+      <div class="preview-output"><div><span class="muted">Best next move</span><strong>↑ Move up</strong></div><div class="preview-confidence">78<span>%</span></div></div>
+      <div class="preview-bars"><div style="--p:78%"><span>Up</span><i></i><b>0.78</b></div><div style="--p:16%"><span>Left</span><i></i><b>0.16</b></div><div style="--p:6%"><span>Right</span><i></i><b>0.06</b></div></div>
+      <div class="preview-bottom"><span class="mono">choice</span><span>Every option. Every probability.</span></div>
+    </div>
+  </section>
+  <section aria-labelledby="explore-title">
+    <div class="section-heading"><div><span class="kicker">Explore</span><h2 id="explore-title">Three ways to see it work.</h2></div><span class="muted">Run solo or compare models side by side.</span></div>
+    <div class="demo-grid">
+      <a class="demo-card" href="2048/">
+        <div class="demo-art art-game" aria-hidden="true"><div class="mini-board"><b>2</b><b>4</b><b></b><b>8</b><b></b><b>8</b><b>16</b><b></b><b>4</b><b>16</b><b>32</b><b>64</b><b></b><b>32</b><b>64</b><b>128</b></div><span class="art-tag">↑ next move</span></div>
+        <div class="demo-copy"><span class="demo-type">01 / INTERACTIVE</span><h3>2048 autopilot <span>↗</span></h3><p>A familiar game. A new way to watch a model think. Follow each move and its probabilities.</p><div class="demo-bottom"><span>Text input</span><span>Launch demo →</span></div></div>
+      </a>
+      <a class="demo-card" href="2048-vision/">
+        <div class="demo-art art-vision" aria-hidden="true"><div class="viewfinder"><div class="vision-cells"><b>2</b><b>8</b><b>16</b><b>4</b><b>32</b><b>64</b><b>8</b><b>16</b><b>128</b></div><span class="scan-line"></span></div><span class="art-tag">image → decision</span></div>
+        <div class="demo-copy"><span class="demo-type">02 / MULTIMODAL</span><h3>2048 vision <span>↗</span></h3><p>The same challenge, seen through pixels. The model reads the board from a screenshot.</p><div class="demo-bottom"><span>Image input</span><span>Launch demo →</span></div></div>
+      </a>
+      <a class="demo-card" href="bookmarks/">
+        <div class="demo-art art-bookmarks" aria-hidden="true"><div class="mini-links"><div><span>⌘</span><b>MDN Web Docs</b><i>dev</i></div><div><span>≡</span><b>Hacker News</b><i>reading</i></div><div><span>↗</span><b>Linear</b><i>work</i></div></div></div>
+        <div class="demo-copy"><span class="demo-type">03 / CLASSIFICATION</span><h3>Bookmark sorter <span>↗</span></h3><p>Turn a pile of links into a useful library. Sort by category and surface uncertain results.</p><div class="demo-bottom"><span>Batch input</span><span>Launch demo →</span></div></div>
+      </a>
+    </div>
+  </section>
+  <section class="connection-panel" aria-label="Bridge connection">
+    <div class="spread"><div class="row" id="status-row" role="status"><span class="badge">Checking connection…</span></div><button id="recheck" class="ghost">Refresh connection</button></div>
+    <details class="raw" id="provider-details"><summary>Available providers</summary><div class="chips" id="prov-chips"></div></details>
+    <details class="raw" id="howto"><summary>Local setup</summary><p class="muted">Start a Jev-compatible bridge, then set its endpoint in a demo's model settings.</p><pre class="json">LogJev (Node.js):  npm start                 → http://127.0.0.1:8013
+LogJev-py:        uv run python -m uvicorn logjev.main:app --port 8012
+Standalone demos: npm start                 → http://127.0.0.1:8099</pre></details>
+  </section>
+  <footer class="workspace-footer"><span>Jev / decision lab</span><span>Your models. Your bridge. Keys stay on the server.</span></footer>
+</main>
+<script src="jev-client.js?v=15"></script>
+<script>
+injectDemoNav();
+async function checkConnection() {
+  const row = document.getElementById("status-row");
+  const chips = document.getElementById("prov-chips");
+  const button = document.getElementById("recheck");
+  button.disabled = true;
+  const endpoint = JEV.endpoint.replace(/\/+$/, "");
+  let health = null;
+  try { const r = await fetch(endpoint + "/health", { signal: AbortSignal.timeout(5000) }); if (r.ok) health = await r.json(); } catch (_) {}
+  chips.innerHTML = "";
+  if (health) {
+    row.innerHTML = `<span class="badge good">● Bridge connected</span><span class="muted">${escapeHtml(health.model || "")} <span class="connection-address">/ ${escapeHtml(endpoint)}</span></span>`;
+    (health.providers || []).forEach((p) => {
+      const chip = document.createElement("span");
+      chip.className = "badge" + (p.name === health.active ? " good" : "");
+      chip.textContent = `${p.name} · ${p.model}`;
+      chips.appendChild(chip);
+    });
+  } else {
+    row.innerHTML = `<span class="badge warn">● Bridge offline</span><span class="muted">Start your bridge to run a demo. <span class="connection-address">${escapeHtml(endpoint)}</span></span>`;
+  }
+  document.getElementById("provider-details").hidden = !health;
+  button.disabled = false;
+}
+document.getElementById("recheck").onclick = checkConnection;
+checkConnection();
+</script>
+</body>
+</html>

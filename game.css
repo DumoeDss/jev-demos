@@ -1,0 +1,115 @@
+/* Both comparison columns keep a board + inspector layout on desktop. */
+.stage { height: 100%; display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "game controls" "game decision"; gap: 14px; }
+.game-panel { grid-area: game; height: 100%; min-height: 0; display: flex; flex-direction: column; container-type: size; background-color: var(--c-bg-alt); background-image: linear-gradient(#1f2be008 1px, transparent 1px), linear-gradient(90deg, #1f2be008 1px, transparent 1px); background-size: 24px 24px; }
+.control-panel { grid-area: controls; }
+.decision-panel { grid-area: decision; min-height: 0; overflow: auto; scrollbar-width: thin; display: flex; flex-direction: column; }
+.decision-panel > :not(.decision-details) { flex: none; }
+.decision-details { flex: 1; min-height: 112px; display: grid; gap: 12px; }
+.vision-page .decision-details { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
+.decision-details details.raw { min-width: 0; min-height: 0; margin-top: 12px; display: flex; flex-direction: column; }
+.decision-details details.raw > summary { flex: none; }
+.decision-details details.raw[open]::details-content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.decision-details pre.json, .image-preview { flex: 1; min-height: 0; overflow: auto; margin: 8px 0 0; scrollbar-width: thin; }
+.decision-details pre.json { max-height: none; }
+.image-preview p { font-size: 10px; margin: 0 0 6px; }
+.image-preview .shot { width: auto; height: auto; max-width: 100%; max-height: min(150px, 100%); margin: 0; object-fit: contain; }
+.image-preview:has(.shot[src]) p { display: none; }
+.board-heading { display: flex; align-items: center; gap: 12px; flex: none; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--c-border-strong); }
+.board-heading > .ghost { margin-left: auto; font-size: 11px; padding: 6px 9px; }
+.score-stat { min-width: 45px; }
+.score-stat span { display: block; color: var(--c-fg-2); font: 9px var(--f-mono); text-transform: uppercase; letter-spacing: .7px; }
+.score-stat b { display: block; font: italic 400 34px/1 var(--f-display); margin-top: 5px; letter-spacing: -.8px; font-variant-numeric: tabular-nums; }
+.score-stat + .score-stat { padding-left: 12px; border-left: 1px solid var(--c-border); }
+.score-stat .best { color: #6970a5; }
+.board-wrap { flex: none; position: relative; width: min(100%, calc(100cqh - 156px)); margin: auto; border-radius: 3px; }
+.vision-page .board-wrap { width: min(100%, calc((100cqh - 156px) * .892)); }
+.board { width: 100%; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 7px; background: #e6e0ce; border: 1px solid #1f2be050; border-radius: 3px; padding: 8px; aspect-ratio: 1; touch-action: none; user-select: none; }
+canvas.board { display: block; padding: 0; aspect-ratio: auto; }
+.cell { min-width: 0; display: flex; align-items: center; justify-content: center; border-radius: 2px; background: #1f2be00b; color: #1f2be0; font: 500 clamp(20px, 2.2vw, 34px) var(--f-body); letter-spacing: -.7px; }
+.cell.v2 { background: #faf7ef; }
+.cell.v4 { background: #e0e0f1; }
+.cell.v8 { background: #bfc4ef; }
+.cell.v16 { background: #99a0ee; color: #1d267d; }
+.cell.v32 { background: #727ce5; color: #111953; }
+.cell.v64 { background: #5560e5; color: #fff; }
+.cell.v128 { background: #3b48e1; color: #fff; }
+.cell.v256 { background: #1f2be0; color: #fff; }
+.cell.v512 { background: #1923b4; color: #fff; }
+.cell.v1024, .cell.v2048 { background: #151d8c; color: #f0ebde; }
+.overlay { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: #f0ebdeed; border-radius: 3px; }
+.overlay b { font-size: 26px; font-weight: 600; }
+.moves { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; width: 100%; max-width: 520px; margin: 12px auto 0; flex: none; }
+.moves button { font-size: 17px; min-height: 32px; padding: 4px; border-color: var(--c-border); }
+.moves button.chosen { background: #e0e0f1; border-color: #1f2be0; color: #1f2be0; }
+.moves button.illegal { opacity: .3; }
+.keyboard-hint { flex: none; text-align: center; margin: 9px 0 0; color: var(--c-fg-3); font-size: 10px; }
+kbd { font: 10px var(--f-mono); border: 1px solid var(--c-border); border-radius: 3px; padding: 1px 3px; }
+.control-panel .panel-heading { margin-bottom: 11px; }
+.control-panel .panel-description { display: none; }
+.controls-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.controls-row button { min-height: 36px; padding: 7px 8px; font-size: 12px; }
+.interval-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; color: var(--c-fg-2); font-size: 11px; }
+.interval-row select { width: 158px; min-height: 30px; padding-top: 4px; padding-bottom: 4px; font-size: 11px; }
+.run-status { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--c-fg-3); }
+.run-status::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #a0a3be; }
+.run-status.running::before { background: #1f2be0; }
+.decision-top { margin-bottom: 15px; padding: 12px; border: 1px solid #1f2be033; border-left: 3px solid var(--c-accent); border-radius: 2px; background: #eae8f2; }
+.decision-label { display: block; color: var(--c-fg-2); font-size: 10px; margin-bottom: 2px; }
+.decision-top strong { font: italic 400 28px/1.2 var(--f-display); text-transform: capitalize; }
+.confidence { float: right; margin-top: 6px; color: var(--c-accent); font: 17px var(--f-mono); }
+.decision-note { margin: 12px 0 0; color: var(--c-fg-3); font-size: 11px; }
+.shot { display: none; width: 150px; max-width: 100%; margin-top: 12px; border-radius: 3px; }
+.cmp-col .stage { gap: 10px; }
+.cmp-col .stage > .card { padding: 14px; }
+.cmp-col .decision-panel .eyebrow { display: none; }
+@media (min-width: 1700px) { .stage { grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); } }
+@media (min-width: 1001px) and (max-height: 820px) {
+  .decision-panel .panel-heading { margin-bottom: 10px; }
+  .decision-top { padding: 8px 10px; margin-bottom: 12px; }
+  .decision-label { display: none; }
+  .decision-note { display: none; }
+  .decision-panel .meta { margin-top: 10px; }
+  .decision-panel .meta .good { display: none; }
+  .decision-panel .bars { gap: 6px; }
+  .decision-panel .bar-row { line-height: 1.25; }
+  .decision-panel .decision-top { padding: 6px 10px; margin-bottom: 8px; }
+  .decision-panel .decision-top strong { font-size: 24px; }
+  .decision-panel .decision-top .confidence { margin-top: 3px; font-size: 15px; }
+  .decision-details { min-height: 82px; }
+  .decision-details details.raw { margin-top: 8px; padding-top: 6px; }
+}
+@media (min-width: 1500px) and (min-height: 900px) {
+  .stage > .card, .cmp-col .stage > .card { padding: 20px; }
+  .stage .card h2 { font-size: 15px; }
+  .bar-row .lbl { font-size: 14px; }
+  .bar-row .pct { font-size: 12px; }
+  .bars { gap: 20px; }
+  .controls-row button { min-height: 40px; font-size: 13px; }
+  .decision-top { padding: 14px; margin-bottom: 22px; }
+  .decision-top strong { font-size: 21px; }
+  .decision-top .confidence { font-size: 19px; }
+}
+@media (max-width: 1200px) and (min-width: 1001px) {
+  .cmp-col .stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .cmp-col .stage > .card { padding: 10px; }
+  .cmp-col .controls-row { grid-template-columns: 1fr; }
+  .cmp-col .board-heading { gap: 6px; flex-wrap: wrap; }
+  .cmp-col .board-heading > .ghost { min-height: 28px; }
+  .cmp-col .keyboard-hint { font-size: 9px; }
+  .cmp-col .interval-row { flex-wrap: wrap; gap: 4px; }
+}
+@media (max-width: 1000px), (max-height: 650px) {
+  .stage { height: auto; min-height: 460px; }
+  .game-panel { container-type: normal; }
+  .board-wrap, .vision-page .board-wrap { width: 100%; max-width: 460px; margin: auto; }
+  .cmp-col .stage { grid-template-columns: 1fr; grid-template-rows: auto; grid-template-areas: "controls" "game" "decision"; }
+  .cmp-col .board-wrap, .cmp-col .vision-page .board-wrap { max-width: 340px; }
+  .game-panel, .decision-panel { height: auto; overflow: visible; }
+  .decision-details { flex: none; min-height: 0; }
+  .decision-details pre.json { flex: none; max-height: 240px; }
+  .image-preview { flex: none; max-height: 200px; }
+}
+@media (max-width: 600px) {
+  .stage { grid-template-columns: 1fr; grid-template-rows: auto; grid-template-areas: "controls" "game" "decision"; }
+  .board-wrap, .vision-page .board-wrap { max-width: 390px; }
+}

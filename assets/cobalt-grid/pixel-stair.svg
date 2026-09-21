@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+  <!-- Cobalt Grid by Zara Zhang, MIT. See LICENSE in this directory. -->
+  <defs><pattern id="stripes" width="2.4" height="100" patternUnits="userSpaceOnUse"><path d="M.5 0v100" stroke="#1f2be0" stroke-width="1"/></pattern></defs>
+  <g fill="url(#stripes)"><path d="M36 0h38v14H36zM22 14h50v12H22zM34 26h46v11H34zM16 37h60v13H16zM28 50h48v11H28zM18 61h62v14H18zM34 75h44v12H34zM22 87h50v13H22z"/></g>
+</svg>
