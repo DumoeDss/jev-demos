@@ -2,7 +2,7 @@
 
 Shared browser demos for Jev-compatible decision APIs: text 2048, vision 2048, and bookmark classification. [LogJev (Node.js)](https://github.com/DumoeDss/logjev) and [LogJev-py](https://github.com/DumoeDss/logjev-py) include this repository as their `demos/` Git submodule.
 
-Download [v0.1.0](https://github.com/DumoeDss/jev-demos/releases/tag/v0.1.0) or clone this repository:
+Download [v0.1.1](https://github.com/DumoeDss/jev-demos/releases/tag/v0.1.1) or clone this repository:
 
 ```sh
 git clone https://github.com/DumoeDss/jev-demos.git

@@ -1,6 +1,6 @@
 {
   "name": "jev-demos",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shared browser demos for LogJev and Jev-compatible decision APIs",
   "repository": { "type": "git", "url": "git+https://github.com/DumoeDss/jev-demos.git" },
   "private": true,

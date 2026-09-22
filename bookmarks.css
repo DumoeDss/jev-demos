@@ -51,6 +51,8 @@ table.res td:nth-child(2) { width: 22% !important; }
 table.res td:last-child { width: 24%; text-align: right; padding-right: 0; }
 table.res td:first-child a { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: 3px; font-size: 10px !important; }
 table.res tr.low td { background: #f5ecdd; }
+table.res tr.error-detail td { width: auto !important; border-top: 0; padding: 0 0 12px; text-align: left; }
+table.res tr.error-detail pre { margin: 0; padding: 10px; border: 1px solid var(--c-border); border-radius: 3px; background: #f5e7e2; color: #833923; font: 11px/1.6 var(--f-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .mini-track { display: block; height: 4px; width: min(100%, 55px); border-radius: 3px; background: #1f2be015; overflow: hidden; margin-bottom: 4px; }
 .mini-fill { height: 100%; display: block; background: #1f2be0; }
 tr.low .mini-fill { background: #8a4c1b; }

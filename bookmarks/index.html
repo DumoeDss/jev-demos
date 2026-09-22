@@ -188,7 +188,7 @@ function mountBookmarks(root, call) {
         done++;
         prog.querySelector(".pfill").style.width = (done / items.length * 100).toFixed(1) + "%";
         prog.setAttribute("aria-valuenow", String(Math.round(done / items.length * 100)));
-        $(".note").textContent = `${done} / ${items.length} classified` + (stopped ? " · stopping…" : "");
+        $(".note").textContent = `${done} / ${items.length} processed` + (stopped ? " · stopping…" : "");
       }
     }
     await Promise.all(Array.from({ length: conc }, worker));
@@ -196,7 +196,7 @@ function mountBookmarks(root, call) {
     out.innerHTML = "";
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
     totals.innerHTML = `
-      <span class="badge">${done} / ${items.length} classified</span>
+      <span class="badge">${done - fails} / ${items.length} classified</span>
       <span class="badge ${fails ? "bad" : "good"}">${fails} failures</span>
       <span class="badge">${inTok} in / ${outTok} out tok</span>
       <span class="badge">${secs} s</span>
@@ -213,13 +213,13 @@ function mountBookmarks(root, call) {
       table.innerHTML = rows.map((r) => `
         <tr class="${r.err ? "" : r.conf < 0.6 ? "low" : ""}">
           <td style="width:52%"><div>${escapeHtml(r.title)}</div><a class="muted mono" style="font-size:11.5px" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.url.slice(0, 56))}</a></td>
-          <td style="width:104px"><span class="mini-track"><span class="mini-fill" style="width:${(r.conf * 100).toFixed(0)}%"></span></span> <span class="muted mono" style="font-size:11.5px">${(r.conf * 100).toFixed(0)}%</span></td>
-          <td>${r.err ? `<span class="badge bad">${escapeHtml(r.err.slice(0, 40))}</span>` : r.conf < 0.6 ? '<span class="badge warn">review</span>' : '<span class="badge good">ok</span>'}</td>
-        </tr>`).join("");
+          <td style="width:104px">${r.err ? '<span class="muted">Unavailable</span>' : `<span class="mini-track"><span class="mini-fill" style="width:${(r.conf * 100).toFixed(0)}%"></span></span> <span class="muted mono" style="font-size:11.5px">${(r.conf * 100).toFixed(0)}%</span>`}</td>
+          <td>${r.err ? '<span class="badge bad">Request failed</span>' : r.conf < 0.6 ? '<span class="badge warn">review</span>' : '<span class="badge good">ok</span>'}</td>
+        </tr>${r.err ? `<tr class="error-detail"><td colspan="3"><pre>${escapeHtml(r.err)}</pre></td></tr>` : ''}`).join("");
       out.appendChild(table);
     }
     running = false; lockInputs(false);
-    $(".note").textContent = stopped ? `Stopped · ${done} of ${items.length} classified` : `Finished in ${secs}s`;
+    $(".note").textContent = stopped ? `Stopped · ${done} of ${items.length} processed` : `Finished in ${secs}s`;
   };
   renderCats();
 }
